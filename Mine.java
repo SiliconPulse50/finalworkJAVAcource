@@ -44,9 +44,9 @@ public class Mine {
             //
             // 可用方法：reply.startsWith("FINAL:")、reply.substring(6)
             // =================================================================
-            if(reply.startsWith("FINAL:")){
-                return reply.substring("Final:".length()).trim();
-            }
+//            if(reply.startsWith("FINAL:")){
+//                return reply.substring("Final:".length()).trim();
+//            }
             // =================================================================
             // TODO 3（解析）：从 reply 里拆出工具名和参数
             //
@@ -72,18 +72,21 @@ public class Mine {
             Map<String, Object> cmd = JsonParser.parseObject(json);
             String action = JsonUtil.getString(cmd, "action", "");
 
+
+            // TODO 2：处理最终答案
             if ("final".equals(action)) {
                 return JsonUtil.getString(cmd, "answer", "").trim();
             }
 
-            String tool = JsonUtil.getString(cmd, "tool", "");
-            String args = JsonUtil.getString(cmd, "args", "");
+            // TODO 3：解析工具指令
+            if (!"tool".equals(action)) {
+                return "协议异常，action=" + action;
+            }
 
-
-
+           String tool = JsonUtil.getString(cmd, "tool", "");
+           String args = JsonUtil.getString(cmd, "args", "");
             // =================================================================
             // TODO 4（执行 + 回填）：
-            //
             // a. 用 switch (tool) 判断，是 "calc" 就调用 new CalcTool().eval(args)
             // b. 把结果拼成一行 "calc(2*200)=400" 追加进 known，末尾要加换行 '\n'
             //    （不加换行的话，第 2 轮的提示词里两行会粘在一起）
