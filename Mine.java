@@ -1,3 +1,5 @@
+import java.util.Map;
+
 /**
  * 第 1 课 · 文件二：主程序（你来填三个 TODO）
  *
@@ -59,12 +61,25 @@ public class Mine {
             // 提示：可以先 String body = reply.substring(...)，再 indexOf('|')
             // =================================================================
 
-            String body=reply.substring("Tool:".length());
-            int bar=body.indexOf('|');
-            //把工具指令拆成“工具名”和“参数”,这样的写法是有缺点的，所以呢就换成解析JSON的方式
-            //缺点：参数里不能出现 |，而且只能有一个参数。这个前提很脆弱，所以换掉
-            String tool=body.substring(0,bar).trim();
-            String args=body.substring(bar+1).trim();
+
+
+            //修改---------模型回复采用解析Json 的方式
+            String json = JsonUtil.extractJson(reply);
+            if (json == null) {
+                return "模型未返回有效 JSON：" + reply;
+            }
+
+            Map<String, Object> cmd = JsonParser.parseObject(json);
+            String action = JsonUtil.getString(cmd, "action", "");
+
+            if ("final".equals(action)) {
+                return JsonUtil.getString(cmd, "answer", "").trim();
+            }
+
+            String tool = JsonUtil.getString(cmd, "tool", "");
+            String args = JsonUtil.getString(cmd, "args", "");
+
+
 
             // =================================================================
             // TODO 4（执行 + 回填）：
@@ -97,8 +112,12 @@ public class Mine {
     static String buildPrompt(String task, String known) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个任务助手。\n");
-        sb.append("需要计算时，只输出：TOOL:calc|算式\n");
-        sb.append("已经有答案时，只输出：FINAL:答案正文\n");
+        //假模型和提示词也要一起改
+        sb.append("需要计算时，只输出JSON：");
+        sb.append("{\"action\":\"tool\",\"tool\":\"calc\",\"args\":\"算式\"}\n");
+
+        sb.append("已经有答案时，只输出JSON：");
+        sb.append("{\"action\":\"final\",\"answer\":\"答案正文\"}\n");
         sb.append("任务：").append(task).append('\n');
         if (!known.isEmpty()) {
             sb.append("已知结果：\n").append(known);
@@ -113,8 +132,8 @@ public class Mine {
      */
     static String fakeLlm(String prompt) {
         if (prompt.contains("已知结果")) {
-            return "FINAL:2 人往返交通费共 400 元";
+            return "{\"action\":\"final\",\"answer\":\"2 人往返交通费共 400 元\"}";
         }
-        return "TOOL:calc|2*200";
+        return "{\"action\":\"tool\",\"tool\":\"calc\",\"args\":\"2*200\"}";
     }
 }
