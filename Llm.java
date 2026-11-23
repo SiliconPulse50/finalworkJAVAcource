@@ -113,6 +113,7 @@ public class Llm {
     }
 
     /** 从 {"choices":[{"message":{"content":"..."}}]} 里取出 content */
+    //这个结构是deepseek返回的json结构，choices是一个数组，里面有一个message对象，message对象里面有content字段
     private String extractContent(String resp) {
         Map<String, Object> root = JsonParser.parseObject(resp);
         List<Object> choices = JsonUtil.getList(root.get("choices"));
