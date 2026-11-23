@@ -32,7 +32,7 @@ public class Llm {
         String k = System.getenv("DEEPSEEK_API_KEY");
         if (k == null || k.isBlank()) {
             throw new IllegalStateException(
-                    "环境变量 DEEPSEEK_API_KEY 未设置。\n"
+                    "环境变量  DEEPSEEK_API_KEY 未设置。\n"
                     + "IDEA：Run -> Edit Configurations -> Environment variables 里加一条\n"
                     + "终端：export DEEPSEEK_API_KEY=sk-xxxxxxxx");
         }
@@ -44,15 +44,26 @@ public class Llm {
      * 签名与 fakeLlm 完全一致，所以可以直接替换。
      */
     public String chat(String prompt) {
+        // 这两行打印有两个用处：
+        //   1) 让你一眼看出"这次真的走了网络"，而不是假模型瞬间返回
+        //   2) 带上线程名，第 5 课多会话并发时，日志里能看出是谁在等
+        String who = Thread.currentThread().getName();
+        System.out.println("[" + who + "] [LLM] -> 请求 DeepSeek，提示词 " + prompt.length() + " 字符");
+        long t0 = System.currentTimeMillis();
+
         try {
+            //拼接请求体，调用deepseek,提取回复，去掉首尾空白
             String body = buildBody(prompt);
             String resp = post(body);
             String content = extractContent(resp);
             if (content == null) {
                 throw new IllegalStateException("响应里没有 content，原始响应：" + resp);
             }
+            System.out.println("[" + who + "] [LLM] <- 返回 " + content.length() + " 字符，耗时 "
+                    + (System.currentTimeMillis() - t0) + " ms");
             return content.trim();
         } catch (IOException e) {
+            System.out.println("[" + who + "] [LLM] <- 失败，耗时 " + (System.currentTimeMillis() - t0) + " ms");
             // 转成非受检异常，这样 AgentLoop 不用改方法签名
             throw new RuntimeException("调用 DeepSeek 失败：" + e.getMessage(), e);
         }

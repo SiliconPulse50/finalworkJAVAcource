@@ -27,13 +27,15 @@ public class Mine {
 
         // 记着"已经知道了什么"，每轮的工具结果都追加进来
         StringBuilder known = new StringBuilder();
+        Llm llm=new Llm();
 
         for (int round = 1; round <= 3; round++) {
             System.out.println("---------- 第 " + round + " 轮 ----------");
 
             String prompt = buildPrompt(task, known.toString());
             System.out.println("[发给模型] " + prompt.replace("\n", " / "));
-            String reply = fakeLlm(prompt);
+            //String reply = fakeLlm(prompt);
+            String reply = llm.chat(prompt);
             System.out.println("[模型说] " + reply);
 
             // =================================================================
