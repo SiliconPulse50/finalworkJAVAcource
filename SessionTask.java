@@ -26,6 +26,8 @@ public class SessionTask implements Runnable {
     private final int id;
     private final Llm llm;
 
+
+
     public SessionTask(Socket socket, int id, Llm llm) {
         this.socket = socket;
         this.id = id;
@@ -34,6 +36,8 @@ public class SessionTask implements Runnable {
 
     @Override
     public void run() {
+
+
         long t0 = System.currentTimeMillis();
         Log.info(id, "线程启动 " + Thread.currentThread().getName());
 
@@ -64,8 +68,13 @@ public class SessionTask implements Runnable {
 
                 long t0Task = System.currentTimeMillis();
                 try {
-                    String answer = Mine.run(task);
-                    out.println(answer);
+                    Progress progress = line -> out.println("[进度] " + line);
+                    String answer = Mine.run(task, progress);
+                    out.println("[结果] " + answer);
+                    out.println("[结束]");
+
+//                    String answer = Mine.run(task);
+//                    out.println(answer);
                     Log.info(id, "第 " + round + " 个任务完成，耗时 "
                             + (System.currentTimeMillis() - t0Task) + " ms");
 

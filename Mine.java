@@ -15,7 +15,8 @@ public class Mine {
         System.out.println("任务：" + task);
         System.out.println();
 
-        String answer = run(task);
+        //String answer = run(task);
+        String answer = run(task, line -> System.out.println("  [进度] " + line));
 
         System.out.println();
         System.out.println("===== 最终答案 =====");
@@ -23,95 +24,112 @@ public class Mine {
     }
 
     /** Agent 的全部编排逻辑，都在这个 for 里 */
-    static String run(String task) {
+    static String run(String task, Progress progress) {
 
-        // 记着"已经知道了什么"，每轮的工具结果都追加进来
+        // 记着"已经知道了什么"。每轮的工具结果都追加进来，下一轮拼进提示词。
         StringBuilder known = new StringBuilder();
-        Llm llm=new Llm();
+        Llm llm = new Llm();
 
         for (int round = 1; round <= 3; round++) {
-            System.out.println("---------- 第 " + round + " 轮 ----------");
+
+            // ==========================================================
+            // 第 1 步：拼提示词，问模型
+            // ----------------------------------------------------------
+            // 提示词 = 角色说明 + 输出格式 + 任务 + 已知结果。
+            // 模型只能看到提示词里的东西，所以"已经算过什么"必须每轮都带上，
+            // 否则它每一轮都会重新要求调用同一个工具。
+            // ==========================================================
+            progress.emit("第 " + round + " 轮：正在请求模型...");
 
             String prompt = buildPrompt(task, known.toString());
-            System.out.println("[发给模型] " + prompt.replace("\n", " / "));
-            //String reply = fakeLlm(prompt);
+
+            // 调试用：想看完整提示词就打开下面这行（会打在服务端控制台，不影响客户端）
+            // System.out.println("[调试] 提示词 = " + prompt.replace("\n", " / "));
+
             String reply = llm.chat(prompt);
-            System.out.println("[模型说] " + reply);
 
-            // =================================================================
-            // TODO 2（出口）：先写这个，它是整个循环唯一能返回的地方
-            //
-            // 如果 reply 以 "FINAL:" 开头，就把 "FINAL:" 后面那段作为答案返回。
-            // 判定标准：跑起来时，第 2 轮应该直接结束，不会走到第 3 轮。
-            //
-            // 可用方法：reply.startsWith("FINAL:")、reply.substring(6)
-            // =================================================================
-//            if(reply.startsWith("FINAL:")){
-//                return reply.substring("Final:".length()).trim();
-//            }
-            // =================================================================
-            // TODO 3（解析）：从 reply 里拆出工具名和参数
-            //
-            // reply 的格式固定是：TOOL:calc|2*200
-            // 你要得到 tool = "calc"，args = "2*200"。
-            //
-            // 建议的三步：
-            //   a. 去掉前面的 "TOOL:"（长度是多少？数一数）
-            //   b. 找 '|' 的位置
-            //   c. 按 '|' 切成两半
-            //
-            // 提示：可以先 String body = reply.substring(...)，再 indexOf('|')
-            // =================================================================
+            progress.emit("第 " + round + " 轮：模型返回 " + reply);
 
-
-
-            //修改---------模型回复采用解析Json 的方式
+            // ==========================================================
+            // 第 2 步：判断它是不是要给答案了（循环的唯一出口）
+            // ----------------------------------------------------------
+            // 模型的回复有两种：带 JSON（要调工具）、不带 JSON（在说人话，即答案）。
+            // extractJson 返回 null 就是后者，这时把原文整个当答案返回。
+            //
+            // 作业里那句"直到大模型生成最终结果"，实现上就是这个 if。
+            // ==========================================================
             String json = JsonUtil.extractJson(reply);
             if (json == null) {
-                return "模型未返回有效 JSON：" + reply;
+                return reply.trim();
             }
 
             Map<String, Object> cmd = JsonParser.parseObject(json);
             String action = JsonUtil.getString(cmd, "action", "");
 
-
-            // TODO 2：处理最终答案
+            // 带 JSON 也分两种：action=final（给答案）或 action=tool（要工具）
             if ("final".equals(action)) {
                 return JsonUtil.getString(cmd, "answer", "").trim();
             }
-
-            // TODO 3：解析工具指令
             if (!"tool".equals(action)) {
                 return "协议异常，action=" + action;
             }
 
-           String tool = JsonUtil.getString(cmd, "tool", "");
-           String args = JsonUtil.getString(cmd, "args", "");
-            // =================================================================
-            // TODO 4（执行 + 回填）：
-            // a. 用 switch (tool) 判断，是 "calc" 就调用 new CalcTool().eval(args)
-            // b. 把结果拼成一行 "calc(2*200)=400" 追加进 known，末尾要加换行 '\n'
-            //    （不加换行的话，第 2 轮的提示词里两行会粘在一起）
+            // ==========================================================
+            // 第 3 步：解析工具指令
+            // ----------------------------------------------------------
+            // 解析后的 Map 长这样：{action=tool, tool=calc, args=2*200}
             //
-            // 拼字符串可以用：known.append(tool).append('(').append(args)...
-            // 把 long 转成字符串可以用：String.valueOf(结果)
-            String result;
-            switch (tool) {
-                case "calc":
-                    result = String.valueOf(new CalcTool().eval(args));
-                    break;
-                default:
-                    result = "未知工具：" + tool;
-            }
-            known.append(tool).append('(').append(args).append(")=").append(result).append('\n');
-            System.out.println("[工具] " + tool + "(" + args + ") = " + result);
-            // =================================================================
+            // getString 的第三个参数是"字段不存在时的默认值"，
+            // 防止模型漏字段时拿到 null、后面空指针。
+            //
+            // 为什么不用 substring 切了？
+            //   因为 JSON 里有花括号、引号、转义，而且模型还可能在
+            //   外面包一层 ```json 围栏或加上"好的，我来算"这种解释文字。
+            // ==========================================================
+            String tool = JsonUtil.getString(cmd, "tool", "");
+            String args = JsonUtil.getString(cmd, "args", "");
 
-            System.out.println();   // 轮次之间空一行，好看
+            // ==========================================================
+            // 第 4 步：执行工具，把结果回填
+            // ----------------------------------------------------------
+            // a. dispatch 用 switch 分发，没有框架、没有反射
+            // b. 把结果拼成 "calc(2*200)=400" 追加到 known，末尾必须带 \n
+            //
+            // 回填是整件事的关键：模型自己不会算术。
+            // 第 1 轮它只会说"我要算 2*200"，你把这行结果告诉它，
+            // 第 2 轮它才写得出"共 400 元"。
+            // ==========================================================
+            progress.emit("第 " + round + " 轮：调用 " + tool + "(" + args + ")");
+
+            String result = dispatch(tool, args);
+
+            progress.emit("第 " + round + " 轮：工具返回 " + result);
+
+            known.append(tool).append('(').append(args).append(")=").append(result).append('\n');
         }
 
+        // 3 轮用完还没答案：兜底返回，绝不能让调用方拿到 null
         return "3 轮用完，模型还没给出最终答案";
     }
+
+    /**
+     * 工具分发：一个 switch。
+     *
+     * 这就是作业里「用 if-else 或 switch 依次调用本地工具类」那一条。
+     * 加一个新工具只改两处：
+     *   1) 写一个工具类，比如 HotelTool
+     *   2) 在这里加一个 case
+     */
+    static String dispatch(String tool, String args) {
+        switch (tool) {
+            case "calc":
+                return String.valueOf(new CalcTool().eval(args));
+            default:
+                return "未知工具：" + tool;
+        }
+    }
+
+
 
     /** 拼提示词（已经写好了，不用改，但要看懂它拼出了什么） */
     static String buildPrompt(String task, String known) {

@@ -38,24 +38,45 @@ public class AgentClient {
                      new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8), true);
              Scanner scanner = new Scanner(System.in)) {
 
+
+            System.out.println(" 等待服务端处理（真模型要 3~10 秒）...");
+            // 外层：每问一个问题，跑一次
             while (true) {
                 System.out.print("任务> ");
                 String task = scanner.nextLine();
 
-                if (task == null || task.isBlank()) continue;
+                if (task.isBlank()) continue;
                 if ("exit".equalsIgnoreCase(task.trim())) break;
 
-                out.println(task);          // 发一行（println 自带换行，服务端才能 readLine 到）
+                out.println(task);
+                System.out.println(" 等待服务端处理（真模型要 3~10 秒）...");
 
-                System.out.println("  等待服务端处理（真模型要 3~10 秒）...");
-                String answer = in.readLine();   // 阻塞等结果
+                // 内层：把这一次应答的所有帧读完
+                while (true) {
+                    String line = in.readLine();
 
-                if (answer == null) {
-                    System.out.println("  服务端关闭了连接");
-                    break;
+                    if (line == null) {
+                        System.out.println("  服务端已断开");
+                        return;
+                    }
+                    if ("[结束]".equals(line)) {
+                        break;                       // ← 只跳出内层，回到外层继续问
+                    }
+
+                    if (line.startsWith("[进度]")) {
+                        System.out.println("  " + line);
+                    } else if (line.startsWith("[结果]")) {
+                        System.out.println("答案：" + line.substring("[结果]".length()).trim());
+                    } else {
+                        System.out.println("  " + line);
+                    }
                 }
-                System.out.println("答案：" + answer + "\n");
+
+                System.out.println();
             }
+
+            System.out.println();
+
         }
 
         System.out.println("已断开。");
