@@ -15,6 +15,15 @@
  *   Long.parseLong(str)      把字符串变成数字
  */
 public class CalcTool {
+    /** args 格式："80,90,75"，返回平均值（保留一位小数） */
+    public String avg(String args) {
+        String[] parts = args.split(",");
+        double sum = 0;
+        for (String p : parts) {
+            sum += Double.parseDouble(p.trim());
+        }
+        return String.format("%.1f", sum / parts.length);
+    }
 
     public long eval(String expr) {
         // TODO 1：把这里换成你自己的实现
@@ -24,6 +33,15 @@ public class CalcTool {
         //   c. 如果 star < 0，说明没有乘号 → 抛异常
         //   d. 否则把左右两段各 parse 成 long，返回它们的乘积
         expr=expr.trim();
+        int plus = expr.indexOf('+');
+        if (plus > 0) {
+            long sum = 0;
+            for (String part : expr.split("\\+")) {
+                sum += Long.parseLong(part.trim());
+            }
+            return sum;
+        }
+
         int star=expr.indexOf('*');
         if(star>0){
            long a=Long.parseLong(expr.substring(0,star).trim());
@@ -35,5 +53,12 @@ public class CalcTool {
 //    public static void main(String[] args) {
 //        System.out.println(new CalcTool().eval("2*200"));
 //    }
+// 在 CalcTool 里临时加，测完注释掉
+public static void main(String[] args) {
+    CalcTool c = new CalcTool();
+    System.out.println(c.avg("80,90,75"));      // 81.7
+    System.out.println(c.avg("80, 90, 75"));    // 81.7  ← 带空格也得行
+    System.out.println(c.avg("100"));           // 100.0
+}
 
 }
