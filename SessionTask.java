@@ -68,6 +68,8 @@ public class SessionTask implements Runnable {
 
                 long t0Task = System.currentTimeMillis();
                 try {
+                    //mine.run 里有一个 for 循环，循环里每轮都要发请求给 llm.chat()，所以这里传一个 Progress 实现进去，让 run() 里每轮都能回调进度
+                    //line是参数，->右边是实现，等价于匿名类实现Progress接口的emit方法
                     Progress progress = line -> out.println("[进度] " + line);
                     String answer = Mine.run(task, progress);
                     out.println("[结果] " + answer);

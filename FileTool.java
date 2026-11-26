@@ -24,6 +24,7 @@ public class FileTool {
 
     /** args 格式："文件名,内容"。只按【第一个】逗号切，内容里的逗号不受影响 */
     public String write(String args) {
+       // indexOf(',') + 两次 substring	切出 name 和 content
         int comma = args.indexOf(',');
         if (comma < 0) {
             return "参数错误：应为 文件名,内容";
@@ -32,8 +33,11 @@ public class FileTool {
         String content = args.substring(comma + 1);
 
         try {
+            //Files.createDirectories(DIR)	保证 data 目录存在
             Files.createDirectories(DIR);
+            //DIR.resolve(name)	名字 + 目录 → 完整路径
             Path p = DIR.resolve(name);
+            //Files.writeString(p, content, UTF_8)	把内容写进那个路径
             Files.writeString(p, content, StandardCharsets.UTF_8);
             return "已写入 " + p.toAbsolutePath() + "（" + content.length() + " 字符）";
         } catch (IOException e) {

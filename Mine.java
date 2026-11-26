@@ -11,7 +11,7 @@ import java.util.Map;
 public class Mine {
 
     public static void main(String[] args) {
-        String task = "帮我算深圳两日游的往返交通费：2 个人，每人 200 元";
+        String task = "一家三口去玩，孩子 8 岁，爸爸 30 岁，爷爷 65 岁，分别买什么票，门票一共多少钱";
         System.out.println("任务：" + task);
         System.out.println();
 
@@ -30,7 +30,7 @@ public class Mine {
         StringBuilder known = new StringBuilder();
         Llm llm = new Llm();
 
-        for (int round = 1; round <= 3; round++) {
+        for (int round = 1; round <= 8; round++) {
 
             // ==========================================================
             // 第 1 步：拼提示词，问模型
@@ -108,8 +108,9 @@ public class Mine {
             known.append(tool).append('(').append(args).append(")=").append(result).append('\n');
         }
 
-        // 3 轮用完还没答案：兜底返回，绝不能让调用方拿到 null
-        return "3 轮用完，模型还没给出最终答案";
+
+        // 8 轮用完还没答案：兜底返回，绝不能让调用方拿到 null
+        return "8 轮用完，模型还没给出最终答案";
     }
 
     /**
@@ -121,9 +122,17 @@ public class Mine {
      *   2) 在这里加一个 case
      */
     static String dispatch(String tool, String args) {
+        CalcTool calc =new CalcTool();
+        HotelTool hotel=new HotelTool();
+        TicketTool ticket=new TicketTool();
+        FileTool file=new FileTool();
         switch (tool) {
-            case "calc":
-                return String.valueOf(new CalcTool().eval(args));
+            case "calc": return String.valueOf(new CalcTool().eval(args));
+            case "avg":  return calc.avg(args);          // 去掉 String.valueOf
+            case "hotel":     return hotel.query(args);
+            case "ticket":    return ticket.query(args);
+            case "readfile":  return file.read(args);
+            case "writefile": return file.write(args);
             default:
                 return "未知工具：" + tool;
         }
@@ -135,12 +144,26 @@ public class Mine {
     static String buildPrompt(String task, String known) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个任务助手。\n");
-        //假模型和提示词也要一起改
-        sb.append("需要计算时，只输出JSON：");
-        sb.append("{\"action\":\"tool\",\"tool\":\"calc\",\"args\":\"算式\"}\n");
+        sb.append("要调用工具时，输出：{\"action\":\"tool\",\"tool\":\"工具名\",\"args\":\"参数\"}\n");
+        sb.append("已有答案时，输出：{\"action\":\"final\",\"answer\":\"答案正文\"}\n\n");
 
-        sb.append("已经有答案时，只输出JSON：");
-        sb.append("{\"action\":\"final\",\"answer\":\"答案正文\"}\n");
+        sb.append("可用工具（args 是一个字符串，多个参数用英文逗号分隔）：\n");
+        sb.append("- calc：算式，只支持 a*b 或 a+b+c。如 \"2*200\"、\"400+1200+440\"\n");
+        sb.append("- avg：求平均值。如 \"80,90,75\"\n");
+        sb.append("- hotel：查酒店总价。args 为 城市,晚数,房型，如 \"深圳,2,豪华\"。城市可选 深圳/广州，房型可选 标准/豪华\n");
+        sb.append("- ticket：查门票价。args 是年龄，如 \"8\"\n");
+        sb.append("- readfile：读文件。args 是文件名，如 \"sales.txt\"\n");
+        sb.append("- writefile：写文件。args 为 文件名,内容，如 \"praise.txt,表扬信正文\"\n\n");
+
+        sb.append("示例 1：\n");
+        sb.append("任务：算 3 个人每人 150 元的门票\n");
+        sb.append("输出：{\"action\":\"tool\",\"tool\":\"calc\",\"args\":\"3*150\"}\n\n");
+
+        sb.append("示例 2：\n");
+        sb.append("任务：算 3 个人每人 150 元的门票\n");
+        sb.append("已知结果：\ncalc(3*150)=450\n");
+        sb.append("输出：{\"action\":\"final\",\"answer\":\"3 人门票共 450 元\"}\n\n");
+
         sb.append("任务：").append(task).append('\n');
         if (!known.isEmpty()) {
             sb.append("已知结果：\n").append(known);
