@@ -41,6 +41,7 @@ public class SessionTask implements Runnable {
 
         long t0 = System.currentTimeMillis();
         Log.info(id, "线程启动 " + Thread.currentThread().getName());
+        Online.add(id, "连接中");
 
         try (Socket s = socket;
              BufferedReader in = new BufferedReader(
@@ -66,13 +67,29 @@ public class SessionTask implements Runnable {
 
                 round++;
                 Log.info(id, "收到第 " + round + " 个任务：" + task);
+                Online.add(id, task);
+
 
                 long t0Task = System.currentTimeMillis();
                 try {
                     //mine.run 里有一个 for 循环，循环里每轮都要发请求给 llm.chat()，所以这里传一个 Progress 实现进去，让 run() 里每轮都能回调进度
                     //line是参数，->右边是实现，等价于匿名类实现Progress接口的emit方法
                     Progress progress = line -> out.println("[进度] " + line);
+
+                    String cached = Cache.get(task);
+                    if (cached != null) {
+                        out.println("[进度] 命中缓存，直接返回");
+                        out.println("[结果] " + cached);
+                        out.println("[结束]");
+                        Log.info(id, "命中缓存，跳过模型调用");
+                        Cache.stats();
+                        continue;                 // 回到 while 开头等下一个任务
+                    }
+
                     String answer = Mine.run(task, progress);
+
+                    Cache.put(task, answer);
+
                     out.println("[结果] " + answer);
                     out.println("[结束]");
 
@@ -96,6 +113,8 @@ public class SessionTask implements Runnable {
             Log.info(id, "网络异常：" + e.getClass().getSimpleName() + " " + e.getMessage());
         } finally {
             // 第 6 课会在 finally 里把会话从在线表里移除
+            Online.remove(id);
+
             Log.info(id, "连接已关闭");
         }
     }
