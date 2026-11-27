@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
  * 所以 readLine 必须放在 while (true) 里，只有返回 null（对方关了）才退出。
  */
 //这是“会话”这个概念没落实——一个会话应该能连续处理多个任务，直到客户端主动断开。
+//服务端干活的手，SessionTask 负责连接和消息收发，Mine.run() 负责具体任务处理
 public class SessionTask implements Runnable {
 
     private final Socket socket;

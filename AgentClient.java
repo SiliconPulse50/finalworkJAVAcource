@@ -40,7 +40,9 @@ public class AgentClient {
 
 
             System.out.println(" 等待服务端处理（真模型要 3~10 秒）...");
+            //break 只会跳出它所在的那一层，不会跳两层
             // 外层：每问一个问题，跑一次
+            //使用一行一消息的方法和客户端通信，客户端发一行任务，服务端读到后处理，再把进度和结果按行发回去
             while (true) {
                 System.out.print("任务> ");
                 String task = scanner.nextLine();
@@ -52,6 +54,7 @@ public class AgentClient {
                 System.out.println(" 等待服务端处理（真模型要 3~10 秒）...");
 
                 // 内层：把这一次应答的所有帧读完
+
                 while (true) {
                     String line = in.readLine();
 
